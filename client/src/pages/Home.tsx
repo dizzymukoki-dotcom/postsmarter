@@ -8,53 +8,80 @@ import { Download, Share2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 interface PostData {
+  businessName: string;
+  businessType: string;
   platform: string;
   language: string;
   headline: string;
   subheadline: string;
   cta: string;
   hashtags: string;
-  backgroundImage: string;
 }
 
-const BRAND_TEMPLATES = {
-  "Chicken Inn": {
+const BUSINESS_TYPES = {
+  "Restaurant / Fast Food": {
     colors: { primary: "#E63946", secondary: "#FFB703" },
     image: "https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?w=1200&h=600&fit=crop",
   },
-  "Econet": {
+  "Bar / Nightlife": {
+    colors: { primary: "#8B0000", secondary: "#FFD700" },
+    image: "https://images.unsplash.com/photo-1514432324607-2e467f4af445?w=1200&h=600&fit=crop",
+  },
+  "Retail / Shopping": {
+    colors: { primary: "#FF1493", secondary: "#FFB6C1" },
+    image: "https://images.unsplash.com/photo-1555529669-e69e7ea0bb9b?w=1200&h=600&fit=crop",
+  },
+  "Finance / Banking": {
     colors: { primary: "#0066CC", secondary: "#00D4FF" },
+    image: "https://images.unsplash.com/photo-1556740738-b6a63e27c4df?w=1200&h=600&fit=crop",
+  },
+  "Telecom / Tech": {
+    colors: { primary: "#1E40AF", secondary: "#06B6D4" },
     image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=1200&h=600&fit=crop",
   },
-  "Old Mutual": {
-    colors: { primary: "#8B0000", secondary: "#FFD700" },
-    image: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=1200&h=600&fit=crop",
+  "Healthcare / Wellness": {
+    colors: { primary: "#059669", secondary: "#10B981" },
+    image: "https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=1200&h=600&fit=crop",
   },
-  "Innscor": {
-    colors: { primary: "#DC143C", secondary: "#FFA500" },
-    image: "https://images.unsplash.com/photo-1495521821757-a1efb6729352?w=1200&h=600&fit=crop",
+  "Real Estate": {
+    colors: { primary: "#7C3AED", secondary: "#A78BFA" },
+    image: "https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=1200&h=600&fit=crop",
   },
-  "Steward Bank": {
-    colors: { primary: "#1E40AF", secondary: "#06B6D4" },
-    image: "https://images.unsplash.com/photo-1556740738-b6a63e27c4df?w=1200&h=600&fit=crop",
+  "Education / Training": {
+    colors: { primary: "#D97706", secondary: "#FBBF24" },
+    image: "https://images.unsplash.com/photo-1427504494785-cdaa41d4f869?w=1200&h=600&fit=crop",
+  },
+  "Travel / Tourism": {
+    colors: { primary: "#0891B2", secondary: "#06B6D4" },
+    image: "https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=1200&h=600&fit=crop",
+  },
+  "Entertainment / Events": {
+    colors: { primary: "#EC4899", secondary: "#F472B6" },
+    image: "https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=1200&h=600&fit=crop",
   },
 };
 
 export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [brand, setBrand] = useState("Chicken Inn");
+  const [businessName, setBusinessName] = useState("Your Business");
+  const [businessType, setBusinessType] = useState("Restaurant / Fast Food");
   const [platform, setPlatform] = useState("instagram");
   const [language, setLanguage] = useState("english");
-  const [headline, setHeadline] = useState("CLUCKIN' GOOD DEAL");
-  const [subheadline, setSubheadline] = useState("Weekend Vibes Only");
-  const [cta, setCta] = useState("GET YOURS");
-  const [hashtags, setHashtags] = useState("#ZimFoodie #BulawayoEats #ChickenLovers #WeekendVibes");
+  const [headline, setHeadline] = useState("AMAZING OFFER");
+  const [subheadline, setSubheadline] = useState("Limited Time Only");
+  const [cta, setCta] = useState("SHOP NOW");
+  const [hashtags, setHashtags] = useState("#ZimBusiness #SupportLocal #BuySmart");
   const [isGenerating, setIsGenerating] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string>("");
 
   const generatePost = async () => {
+    if (!businessName.trim()) {
+      toast.error("Please enter a business name");
+      return;
+    }
+
     setIsGenerating(true);
-    
+
     setTimeout(() => {
       const canvas = canvasRef.current;
       if (!canvas) return;
@@ -62,10 +89,10 @@ export default function Home() {
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
 
-      const template = BRAND_TEMPLATES[brand as keyof typeof BRAND_TEMPLATES];
+      const template = BUSINESS_TYPES[businessType as keyof typeof BUSINESS_TYPES];
       const img = new Image();
       img.crossOrigin = "anonymous";
-      
+
       img.onload = () => {
         canvas.width = 1080;
         canvas.height = 1350;
@@ -77,6 +104,15 @@ export default function Home() {
         ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+        // Draw business name badge
+        ctx.fillStyle = template.colors.primary;
+        ctx.fillRect(0, 20, canvas.width, 80);
+        ctx.fillStyle = "#FFFFFF";
+        ctx.font = "bold 32px Arial, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(businessName.toUpperCase(), canvas.width / 2, 60);
+
         // Draw headline
         ctx.fillStyle = "#FFFFFF";
         ctx.font = "bold 120px Arial, sans-serif";
@@ -86,11 +122,11 @@ export default function Home() {
         ctx.shadowBlur = 20;
         ctx.shadowOffsetX = 2;
         ctx.shadowOffsetY = 2;
-        
+
         const headlineY = canvas.height * 0.45;
         const words = headline.split(" ");
         let currentY = headlineY - (words.length - 1) * 60;
-        
+
         words.forEach((word) => {
           ctx.fillText(word, canvas.width / 2, currentY);
           currentY += 120;
@@ -148,7 +184,7 @@ export default function Home() {
 
     const link = document.createElement("a");
     link.href = previewUrl;
-    link.download = `postsmarter-${brand}-${Date.now()}.png`;
+    link.download = `postsmarter-${businessName}-${Date.now()}.png`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -174,7 +210,7 @@ export default function Home() {
             </div>
             <div>
               <h1 className="font-bold text-lg text-slate-900">PostSmarter</h1>
-              <p className="text-xs text-slate-500">Social Media Generator</p>
+              <p className="text-xs text-slate-500">AI Social Media Generator</p>
             </div>
           </div>
           <Badge className="bg-orange-100 text-orange-700 border-orange-300">
@@ -191,17 +227,28 @@ export default function Home() {
             <div className="bg-white rounded-2xl shadow-lg p-8 space-y-6">
               <h2 className="text-2xl font-bold text-slate-900">Create Your Post</h2>
 
-              {/* Brand Selection */}
+              {/* Business Name */}
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Brand</label>
-                <Select value={brand} onValueChange={setBrand}>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Business Name</label>
+                <Input
+                  value={businessName}
+                  onChange={(e) => setBusinessName(e.target.value)}
+                  placeholder="e.g., Chicken Inn Bulawayo"
+                  className="bg-slate-50 border-slate-300 text-slate-900 placeholder:text-slate-400"
+                />
+              </div>
+
+              {/* Business Type */}
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Business Type</label>
+                <Select value={businessType} onValueChange={setBusinessType}>
                   <SelectTrigger className="bg-slate-50 border-slate-300 text-slate-900">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-white border-slate-300">
-                    {Object.keys(BRAND_TEMPLATES).map((b) => (
-                      <SelectItem key={b} value={b}>
-                        {b}
+                    {Object.keys(BUSINESS_TYPES).map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {type}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -219,6 +266,7 @@ export default function Home() {
                     <SelectItem value="instagram">📸 Instagram</SelectItem>
                     <SelectItem value="facebook">👥 Facebook</SelectItem>
                     <SelectItem value="tiktok">🎵 TikTok</SelectItem>
+                    <SelectItem value="whatsapp">💬 WhatsApp</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -244,7 +292,7 @@ export default function Home() {
                 <Input
                   value={headline}
                   onChange={(e) => setHeadline(e.target.value)}
-                  placeholder="e.g., CLUCKIN' GOOD DEAL"
+                  placeholder="e.g., AMAZING OFFER"
                   className="bg-slate-50 border-slate-300 text-slate-900 placeholder:text-slate-400"
                 />
               </div>
@@ -255,7 +303,7 @@ export default function Home() {
                 <Input
                   value={subheadline}
                   onChange={(e) => setSubheadline(e.target.value)}
-                  placeholder="e.g., Weekend Vibes Only"
+                  placeholder="e.g., Limited Time Only"
                   className="bg-slate-50 border-slate-300 text-slate-900 placeholder:text-slate-400"
                 />
               </div>
@@ -266,7 +314,7 @@ export default function Home() {
                 <Input
                   value={cta}
                   onChange={(e) => setCta(e.target.value)}
-                  placeholder="e.g., GET YOURS"
+                  placeholder="e.g., SHOP NOW"
                   className="bg-slate-50 border-slate-300 text-slate-900 placeholder:text-slate-400"
                 />
               </div>
@@ -277,7 +325,7 @@ export default function Home() {
                 <Textarea
                   value={hashtags}
                   onChange={(e) => setHashtags(e.target.value)}
-                  placeholder="e.g., #ZimFoodie #BulawayoEats"
+                  placeholder="e.g., #ZimBusiness #SupportLocal"
                   className="bg-slate-50 border-slate-300 text-slate-900 placeholder:text-slate-400 min-h-20"
                 />
               </div>
@@ -343,12 +391,13 @@ export default function Home() {
 
             {/* Quick Tips */}
             <div className="bg-white rounded-2xl shadow-lg p-6">
-              <h3 className="font-bold text-slate-900 mb-4">💡 Quick Tips</h3>
+              <h3 className="font-bold text-slate-900 mb-4">💡 Pro Tips</h3>
               <ul className="space-y-2 text-sm text-slate-600">
                 <li>✨ Keep headlines short and punchy</li>
                 <li>🎯 Use relevant hashtags for reach</li>
                 <li>📱 Test on different platforms</li>
                 <li>🌍 Translate for local audiences</li>
+                <li>⏰ Post at peak engagement times</li>
               </ul>
             </div>
           </div>
@@ -361,7 +410,7 @@ export default function Home() {
       {/* Footer */}
       <footer className="border-t border-slate-200 bg-white mt-12 py-6">
         <div className="container text-center text-slate-500 text-sm">
-          <p>PostSmarter © 2026 • Create engaging social media content in seconds</p>
+          <p>PostSmarter © 2026 • Create engaging social media content in seconds • Perfect for agencies and businesses</p>
         </div>
       </footer>
     </div>
