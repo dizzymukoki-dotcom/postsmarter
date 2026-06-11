@@ -11,43 +11,33 @@ import { trpc } from "@/lib/trpc";
 const BUSINESS_TYPES = {
   "Restaurant / Fast Food": {
     colors: { primary: "#E63946", secondary: "#FFB703" },
-    image: "https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?w=1200&h=600&fit=crop",
   },
   "Bar / Nightlife": {
     colors: { primary: "#8B0000", secondary: "#FFD700" },
-    image: "https://images.unsplash.com/photo-1514432324607-2e467f4af445?w=1200&h=600&fit=crop",
   },
   "Retail / Shopping": {
     colors: { primary: "#FF1493", secondary: "#FFB6C1" },
-    image: "https://images.unsplash.com/photo-1555529669-e69e7ea0bb9b?w=1200&h=600&fit=crop",
   },
   "Finance / Banking": {
     colors: { primary: "#0066CC", secondary: "#00D4FF" },
-    image: "https://images.unsplash.com/photo-1556740738-b6a63e27c4df?w=1200&h=600&fit=crop",
   },
   "Telecom / Tech": {
     colors: { primary: "#1E40AF", secondary: "#06B6D4" },
-    image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=1200&h=600&fit=crop",
   },
   "Healthcare / Wellness": {
     colors: { primary: "#059669", secondary: "#10B981" },
-    image: "https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=1200&h=600&fit=crop",
   },
   "Real Estate": {
     colors: { primary: "#7C3AED", secondary: "#A78BFA" },
-    image: "https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=1200&h=600&fit=crop",
   },
   "Education / Training": {
     colors: { primary: "#D97706", secondary: "#FBBF24" },
-    image: "https://images.unsplash.com/photo-1427504494785-cdaa41d4f869?w=1200&h=600&fit=crop",
   },
   "Travel / Tourism": {
     colors: { primary: "#0891B2", secondary: "#06B6D4" },
-    image: "https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=1200&h=600&fit=crop",
   },
   "Entertainment / Events": {
     colors: { primary: "#EC4899", secondary: "#F472B6" },
-    image: "https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=1200&h=600&fit=crop",
   },
 };
 
@@ -102,86 +92,80 @@ export default function Home() {
     if (!ctx) return;
 
     const template = BUSINESS_TYPES[businessType as keyof typeof BUSINESS_TYPES];
-    const img = new Image();
-    img.crossOrigin = "anonymous";
+    
+    canvas.width = 1080;
+    canvas.height = 1350;
 
-    img.onload = () => {
-      canvas.width = 1080;
-      canvas.height = 1350;
+    // Draw gradient background
+    const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+    gradient.addColorStop(0, template.colors.primary);
+    gradient.addColorStop(1, template.colors.secondary);
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Draw background image
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    // Add dark overlay
+    ctx.fillStyle = "rgba(0, 0, 0, 0.3)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Add dark overlay
-      ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // Draw business name badge
+    ctx.fillStyle = template.colors.primary;
+    ctx.fillRect(0, 20, canvas.width, 80);
+    ctx.fillStyle = "#FFFFFF";
+    ctx.font = "bold 32px Arial, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(businessName.toUpperCase(), canvas.width / 2, 60);
 
-      // Draw business name badge
-      ctx.fillStyle = template.colors.primary;
-      ctx.fillRect(0, 20, canvas.width, 80);
-      ctx.fillStyle = "#FFFFFF";
-      ctx.font = "bold 32px Arial, sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(businessName.toUpperCase(), canvas.width / 2, 60);
+    // Draw headline
+    ctx.fillStyle = "#FFFFFF";
+    ctx.font = "bold 120px Arial, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.shadowColor = "rgba(0, 0, 0, 0.8)";
+    ctx.shadowBlur = 20;
+    ctx.shadowOffsetX = 2;
+    ctx.shadowOffsetY = 2;
 
-      // Draw headline
-      ctx.fillStyle = "#FFFFFF";
-      ctx.font = "bold 120px Arial, sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.shadowColor = "rgba(0, 0, 0, 0.8)";
-      ctx.shadowBlur = 20;
-      ctx.shadowOffsetX = 2;
-      ctx.shadowOffsetY = 2;
+    const headlineY = canvas.height * 0.45;
+    const words = (content.headline || headline).split(" ");
+    let currentY = headlineY - (words.length - 1) * 60;
 
-      const headlineY = canvas.height * 0.45;
-      const words = (content.headline || headline).split(" ");
-      let currentY = headlineY - (words.length - 1) * 60;
+    words.forEach((word) => {
+      ctx.fillText(word, canvas.width / 2, currentY);
+      currentY += 120;
+    });
 
-      words.forEach((word) => {
-        ctx.fillText(word, canvas.width / 2, currentY);
-        currentY += 120;
-      });
+    // Draw subheadline
+    ctx.font = "40px Arial, sans-serif";
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillText(content.subheadline || subheadline, canvas.width / 2, canvas.height * 0.65);
 
-      // Draw subheadline
-      ctx.font = "40px Arial, sans-serif";
-      ctx.fillStyle = "#FFFFFF";
-      ctx.fillText(content.subheadline || subheadline, canvas.width / 2, canvas.height * 0.65);
+    // Draw CTA button
+    const buttonY = canvas.height * 0.75;
+    const buttonWidth = 400;
+    const buttonHeight = 70;
+    const buttonX = (canvas.width - buttonWidth) / 2;
 
-      // Draw CTA button
-      const buttonY = canvas.height * 0.75;
-      const buttonWidth = 400;
-      const buttonHeight = 70;
-      const buttonX = (canvas.width - buttonWidth) / 2;
+    ctx.fillStyle = template.colors.primary;
+    ctx.beginPath();
+    ctx.roundRect(buttonX, buttonY, buttonWidth, buttonHeight, 35);
+    ctx.fill();
 
-      ctx.fillStyle = template.colors.primary;
-      ctx.beginPath();
-      ctx.roundRect(buttonX, buttonY, buttonWidth, buttonHeight, 35);
-      ctx.fill();
+    ctx.fillStyle = "#FFFFFF";
+    ctx.font = "bold 32px Arial, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(content.cta || cta, canvas.width / 2, buttonY + buttonHeight / 2);
 
-      ctx.fillStyle = "#FFFFFF";
-      ctx.font = "bold 32px Arial, sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(content.cta || cta, canvas.width / 2, buttonY + buttonHeight / 2);
+    // Draw hashtags
+    ctx.font = "24px Arial, sans-serif";
+    ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+    ctx.textAlign = "center";
+    ctx.fillText(content.hashtags || hashtags, canvas.width / 2, canvas.height * 0.95);
 
-      // Draw hashtags
-      ctx.font = "24px Arial, sans-serif";
-      ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
-      ctx.textAlign = "center";
-      ctx.fillText(content.hashtags || hashtags, canvas.width / 2, canvas.height * 0.95);
-
-      // Convert to image
-      const url = canvas.toDataURL("image/png");
-      setPreviewUrl(url);
-    };
-
-    img.onerror = () => {
-      toast.error("Failed to load image");
-    };
-
-    img.src = template.image;
+    // Convert to image
+    const url = canvas.toDataURL("image/png");
+    setPreviewUrl(url);
   };
 
   const downloadPost = () => {
