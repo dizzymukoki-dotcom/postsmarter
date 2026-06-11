@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Download, Share2, Sparkles, Loader } from "lucide-react";
+import { Download, Share2, Sparkles, Loader, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 
@@ -43,6 +43,7 @@ const BUSINESS_TYPES = {
 
 export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [businessName, setBusinessName] = useState("Your Business");
   const [businessType, setBusinessType] = useState("Restaurant / Fast Food");
   const [platform, setPlatform] = useState("instagram");
@@ -53,6 +54,7 @@ export default function Home() {
   const [hashtags, setHashtags] = useState("#ZimBusiness #SupportLocal #BuySmart");
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const [generatedContent, setGeneratedContent] = useState<Record<string, string> | null>(null);
+  const [uploadedImage, setUploadedImage] = useState<string>("");
 
   const generatePostMutation = trpc.content.generatePost.useMutation({
     onSuccess: (data) => {
@@ -84,6 +86,24 @@ export default function Home() {
     });
   };
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please upload an image file");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const imageData = event.target?.result as string;
+      setUploadedImage(imageData);
+      toast.success("Image uploaded! Generate to apply it.");
+    };
+    reader.readAsDataURL(file);
+  };
+
   const renderPost = (content: Record<string, string>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -92,19 +112,50 @@ export default function Home() {
     if (!ctx) return;
 
     const template = BUSINESS_TYPES[businessType as keyof typeof BUSINESS_TYPES];
-    
+
     canvas.width = 1080;
     canvas.height = 1350;
 
+    if (uploadedImage) {
+      // Draw uploaded image as background
+      const img = new Image();
+      img.onload = () => {
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        drawOverlay(ctx, canvas, content, template);
+      };
+      img.onerror = () => {
+        toast.error("Failed to load image");
+        drawGradientBackground(ctx, canvas, template);
+        drawOverlay(ctx, canvas, content, template);
+      };
+      img.src = uploadedImage;
+    } else {
+      drawGradientBackground(ctx, canvas, template);
+      drawOverlay(ctx, canvas, content, template);
+    }
+  };
+
+  const drawGradientBackground = (
+    ctx: CanvasRenderingContext2D,
+    canvas: HTMLCanvasElement,
+    template: (typeof BUSINESS_TYPES)[keyof typeof BUSINESS_TYPES]
+  ) => {
     // Draw gradient background
     const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
     gradient.addColorStop(0, template.colors.primary);
     gradient.addColorStop(1, template.colors.secondary);
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+  };
 
+  const drawOverlay = (
+    ctx: CanvasRenderingContext2D,
+    canvas: HTMLCanvasElement,
+    content: Record<string, string>,
+    template: (typeof BUSINESS_TYPES)[keyof typeof BUSINESS_TYPES]
+  ) => {
     // Add dark overlay
-    ctx.fillStyle = "rgba(0, 0, 0, 0.3)";
+    ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // Draw business name badge
@@ -155,13 +206,15 @@ export default function Home() {
     ctx.font = "bold 32px Arial, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(content.cta || cta, canvas.width / 2, buttonY + buttonHeight / 2);
+    const ctaText = typeof content.cta === "string" ? content.cta : cta;
+    ctx.fillText(ctaText, canvas.width / 2, buttonY + buttonHeight / 2);
 
     // Draw hashtags
     ctx.font = "24px Arial, sans-serif";
     ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
     ctx.textAlign = "center";
-    ctx.fillText(content.hashtags || hashtags, canvas.width / 2, canvas.height * 0.95);
+    const hashtagText = typeof content.hashtags === "string" ? content.hashtags : hashtags;
+    ctx.fillText(hashtagText, canvas.width / 2, canvas.height * 0.95);
 
     // Convert to image
     const url = canvas.toDataURL("image/png");
@@ -225,7 +278,7 @@ export default function Home() {
                 <Input
                   value={businessName}
                   onChange={(e) => setBusinessName(e.target.value)}
-                  placeholder="e.g., Chicken Inn Bulawayo"
+                  placeholder="e.g., Pizza Inn Bulawayo"
                   className="bg-slate-50 border-slate-300 text-slate-900 placeholder:text-slate-400"
                 />
               </div>
@@ -322,6 +375,46 @@ export default function Home() {
                 />
               </div>
 
+              {/* Image Upload */}
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Upload Your Own Image</label>
+                <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center hover:border-slate-400 transition">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                  />
+                  {uploadedImage ? (
+                    <div className="space-y-2">
+                      <img src={uploadedImage} alt="Uploaded" className="w-full h-32 object-cover rounded" />
+                      <Button
+                        onClick={() => {
+                          setUploadedImage("");
+                          if (fileInputRef.current) fileInputRef.current.value = "";
+                        }}
+                        variant="ghost"
+                        size="sm"
+                        className="w-full text-red-600 hover:text-red-700"
+                      >
+                        <X className="w-4 h-4 mr-2" />
+                        Remove Image
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      onClick={() => fileInputRef.current?.click()}
+                      variant="ghost"
+                      className="w-full text-slate-600 hover:text-slate-900"
+                    >
+                      <Upload className="w-5 h-5 mr-2" />
+                      Click to upload image from phone
+                    </Button>
+                  )}
+                </div>
+              </div>
+
               {/* Generate Button */}
               <Button
                 onClick={generatePost}
@@ -348,11 +441,7 @@ export default function Home() {
             <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
               {previewUrl ? (
                 <div className="space-y-4 p-6">
-                  <img
-                    src={previewUrl}
-                    alt="Generated Post"
-                    className="w-full rounded-xl shadow-md"
-                  />
+                  <img src={previewUrl} alt="Generated Post" className="w-full rounded-xl shadow-md" />
                   {generatedContent && (
                     <div className="bg-slate-50 p-4 rounded-lg space-y-2">
                       <p className="text-xs font-semibold text-slate-600">AI-Generated Caption:</p>
@@ -393,7 +482,7 @@ export default function Home() {
               <ul className="space-y-2 text-sm text-slate-600">
                 <li>✨ AI generates culturally-relevant content</li>
                 <li>🎯 Supports Shona & Ndebele for local reach</li>
-                <li>📱 Optimized for all social platforms</li>
+                <li>📱 Use your own images from phone</li>
                 <li>🌍 Test different languages for your audience</li>
                 <li>⏰ Post at peak engagement times</li>
               </ul>
