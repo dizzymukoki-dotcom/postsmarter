@@ -4,19 +4,9 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Download, Share2, Sparkles } from "lucide-react";
+import { Download, Share2, Sparkles, Loader } from "lucide-react";
 import { toast } from "sonner";
-
-interface PostData {
-  businessName: string;
-  businessType: string;
-  platform: string;
-  language: string;
-  headline: string;
-  subheadline: string;
-  cta: string;
-  hashtags: string;
-}
+import { trpc } from "@/lib/trpc";
 
 const BUSINESS_TYPES = {
   "Restaurant / Fast Food": {
@@ -71,8 +61,20 @@ export default function Home() {
   const [subheadline, setSubheadline] = useState("Limited Time Only");
   const [cta, setCta] = useState("SHOP NOW");
   const [hashtags, setHashtags] = useState("#ZimBusiness #SupportLocal #BuySmart");
-  const [isGenerating, setIsGenerating] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string>("");
+  const [generatedContent, setGeneratedContent] = useState<Record<string, string> | null>(null);
+
+  const generatePostMutation = trpc.content.generatePost.useMutation({
+    onSuccess: (data) => {
+      setGeneratedContent(data.content);
+      renderPost(data.content);
+      toast.success("Post generated! ✨");
+    },
+    onError: (error) => {
+      console.error("Generation error:", error);
+      toast.error("Failed to generate post. Try again.");
+    },
+  });
 
   const generatePost = async () => {
     if (!businessName.trim()) {
@@ -80,100 +82,106 @@ export default function Home() {
       return;
     }
 
-    setIsGenerating(true);
+    generatePostMutation.mutate({
+      businessName,
+      businessType,
+      platform: platform as "instagram" | "facebook" | "tiktok" | "whatsapp",
+      language: language as "english" | "shona" | "ndebele",
+      headline,
+      subheadline,
+      cta,
+      hashtags,
+    });
+  };
 
-    setTimeout(() => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
+  const renderPost = (content: Record<string, string>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
 
-      const template = BUSINESS_TYPES[businessType as keyof typeof BUSINESS_TYPES];
-      const img = new Image();
-      img.crossOrigin = "anonymous";
+    const template = BUSINESS_TYPES[businessType as keyof typeof BUSINESS_TYPES];
+    const img = new Image();
+    img.crossOrigin = "anonymous";
 
-      img.onload = () => {
-        canvas.width = 1080;
-        canvas.height = 1350;
+    img.onload = () => {
+      canvas.width = 1080;
+      canvas.height = 1350;
 
-        // Draw background image
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      // Draw background image
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-        // Add dark overlay
-        ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      // Add dark overlay
+      ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Draw business name badge
-        ctx.fillStyle = template.colors.primary;
-        ctx.fillRect(0, 20, canvas.width, 80);
-        ctx.fillStyle = "#FFFFFF";
-        ctx.font = "bold 32px Arial, sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(businessName.toUpperCase(), canvas.width / 2, 60);
+      // Draw business name badge
+      ctx.fillStyle = template.colors.primary;
+      ctx.fillRect(0, 20, canvas.width, 80);
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font = "bold 32px Arial, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(businessName.toUpperCase(), canvas.width / 2, 60);
 
-        // Draw headline
-        ctx.fillStyle = "#FFFFFF";
-        ctx.font = "bold 120px Arial, sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.shadowColor = "rgba(0, 0, 0, 0.8)";
-        ctx.shadowBlur = 20;
-        ctx.shadowOffsetX = 2;
-        ctx.shadowOffsetY = 2;
+      // Draw headline
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font = "bold 120px Arial, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.shadowColor = "rgba(0, 0, 0, 0.8)";
+      ctx.shadowBlur = 20;
+      ctx.shadowOffsetX = 2;
+      ctx.shadowOffsetY = 2;
 
-        const headlineY = canvas.height * 0.45;
-        const words = headline.split(" ");
-        let currentY = headlineY - (words.length - 1) * 60;
+      const headlineY = canvas.height * 0.45;
+      const words = (content.headline || headline).split(" ");
+      let currentY = headlineY - (words.length - 1) * 60;
 
-        words.forEach((word) => {
-          ctx.fillText(word, canvas.width / 2, currentY);
-          currentY += 120;
-        });
+      words.forEach((word) => {
+        ctx.fillText(word, canvas.width / 2, currentY);
+        currentY += 120;
+      });
 
-        // Draw subheadline
-        ctx.font = "40px Arial, sans-serif";
-        ctx.fillStyle = "#FFFFFF";
-        ctx.fillText(subheadline, canvas.width / 2, canvas.height * 0.65);
+      // Draw subheadline
+      ctx.font = "40px Arial, sans-serif";
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillText(content.subheadline || subheadline, canvas.width / 2, canvas.height * 0.65);
 
-        // Draw CTA button
-        const buttonY = canvas.height * 0.75;
-        const buttonWidth = 400;
-        const buttonHeight = 70;
-        const buttonX = (canvas.width - buttonWidth) / 2;
+      // Draw CTA button
+      const buttonY = canvas.height * 0.75;
+      const buttonWidth = 400;
+      const buttonHeight = 70;
+      const buttonX = (canvas.width - buttonWidth) / 2;
 
-        ctx.fillStyle = template.colors.primary;
-        ctx.beginPath();
-        ctx.roundRect(buttonX, buttonY, buttonWidth, buttonHeight, 35);
-        ctx.fill();
+      ctx.fillStyle = template.colors.primary;
+      ctx.beginPath();
+      ctx.roundRect(buttonX, buttonY, buttonWidth, buttonHeight, 35);
+      ctx.fill();
 
-        ctx.fillStyle = "#FFFFFF";
-        ctx.font = "bold 32px Arial, sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(cta, canvas.width / 2, buttonY + buttonHeight / 2);
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font = "bold 32px Arial, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(content.cta || cta, canvas.width / 2, buttonY + buttonHeight / 2);
 
-        // Draw hashtags
-        ctx.font = "24px Arial, sans-serif";
-        ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
-        ctx.textAlign = "center";
-        ctx.fillText(hashtags, canvas.width / 2, canvas.height * 0.95);
+      // Draw hashtags
+      ctx.font = "24px Arial, sans-serif";
+      ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+      ctx.textAlign = "center";
+      ctx.fillText(content.hashtags || hashtags, canvas.width / 2, canvas.height * 0.95);
 
-        // Convert to image
-        const url = canvas.toDataURL("image/png");
-        setPreviewUrl(url);
-        setIsGenerating(false);
-        toast.success("Post generated! ✨");
-      };
+      // Convert to image
+      const url = canvas.toDataURL("image/png");
+      setPreviewUrl(url);
+    };
 
-      img.onerror = () => {
-        setIsGenerating(false);
-        toast.error("Failed to load image");
-      };
+    img.onerror = () => {
+      toast.error("Failed to load image");
+    };
 
-      img.src = template.image;
-    }, 800);
+    img.src = template.image;
   };
 
   const downloadPost = () => {
@@ -333,13 +341,13 @@ export default function Home() {
               {/* Generate Button */}
               <Button
                 onClick={generatePost}
-                disabled={isGenerating}
+                disabled={generatePostMutation.isPending}
                 className="w-full bg-gradient-to-r from-pink-500 to-orange-500 hover:from-pink-600 hover:to-orange-600 text-white font-bold py-6 text-lg rounded-xl"
               >
-                {isGenerating ? (
+                {generatePostMutation.isPending ? (
                   <>
-                    <Sparkles className="w-5 h-5 mr-2 animate-spin" />
-                    Generating...
+                    <Loader className="w-5 h-5 mr-2 animate-spin" />
+                    Generating with AI...
                   </>
                 ) : (
                   <>
@@ -361,6 +369,12 @@ export default function Home() {
                     alt="Generated Post"
                     className="w-full rounded-xl shadow-md"
                   />
+                  {generatedContent && (
+                    <div className="bg-slate-50 p-4 rounded-lg space-y-2">
+                      <p className="text-xs font-semibold text-slate-600">AI-Generated Caption:</p>
+                      <p className="text-sm text-slate-700">{generatedContent.caption || generatedContent.headline}</p>
+                    </div>
+                  )}
                   <div className="grid grid-cols-2 gap-3">
                     <Button
                       onClick={downloadPost}
@@ -393,10 +407,10 @@ export default function Home() {
             <div className="bg-white rounded-2xl shadow-lg p-6">
               <h3 className="font-bold text-slate-900 mb-4">💡 Pro Tips</h3>
               <ul className="space-y-2 text-sm text-slate-600">
-                <li>✨ Keep headlines short and punchy</li>
-                <li>🎯 Use relevant hashtags for reach</li>
-                <li>📱 Test on different platforms</li>
-                <li>🌍 Translate for local audiences</li>
+                <li>✨ AI generates culturally-relevant content</li>
+                <li>🎯 Supports Shona & Ndebele for local reach</li>
+                <li>📱 Optimized for all social platforms</li>
+                <li>🌍 Test different languages for your audience</li>
                 <li>⏰ Post at peak engagement times</li>
               </ul>
             </div>
@@ -410,7 +424,7 @@ export default function Home() {
       {/* Footer */}
       <footer className="border-t border-slate-200 bg-white mt-12 py-6">
         <div className="container text-center text-slate-500 text-sm">
-          <p>PostSmarter © 2026 • Create engaging social media content in seconds • Perfect for agencies and businesses</p>
+          <p>PostSmarter © 2026 • AI-powered social media content for Zimbabwe & SADC • Perfect for agencies and businesses</p>
         </div>
       </footer>
     </div>
