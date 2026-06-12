@@ -7,9 +7,16 @@ vi.mock("../_core/llm", () => ({
   invokeLLM: vi.fn(),
 }));
 
+// Mock the image generation module
+vi.mock("../_core/imageGeneration", () => ({
+  generateImage: vi.fn(),
+}));
+
 import { invokeLLM } from "../_core/llm";
+import { generateImage } from "../_core/imageGeneration";
 
 const mockInvokeLLM = invokeLLM as ReturnType<typeof vi.fn>;
+const mockGenerateImage = generateImage as ReturnType<typeof vi.fn>;
 
 function createMockContext(): TrpcContext {
   return {
@@ -25,6 +32,7 @@ function createMockContext(): TrpcContext {
 describe("contentRouter", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGenerateImage.mockResolvedValue({ url: "https://example.com/image.png" });
   });
 
   describe("generatePost", () => {
@@ -237,7 +245,6 @@ describe("contentRouter", () => {
 
       expect(result.success).toBe(true);
       expect(result.posts).toHaveLength(3);
-      expect(result.count).toBe(3);
       expect(mockInvokeLLM).toHaveBeenCalledTimes(3);
     });
 

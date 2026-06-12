@@ -53,13 +53,19 @@ export default function Home() {
   const [cta, setCta] = useState("SHOP NOW");
   const [hashtags, setHashtags] = useState("#ZimBusiness #SupportLocal #BuySmart");
   const [previewUrl, setPreviewUrl] = useState<string>("");
+  const [aiImageUrl, setAiImageUrl] = useState<string>("");
   const [generatedContent, setGeneratedContent] = useState<Record<string, string> | null>(null);
   const [uploadedImage, setUploadedImage] = useState<string>("");
 
   const generatePostMutation = trpc.content.generatePost.useMutation({
     onSuccess: (data) => {
       setGeneratedContent(data.content);
-      renderPost(data.content);
+      if (data.imageUrl) {
+        setAiImageUrl(data.imageUrl);
+        renderPostWithAIImage(data.content, data.imageUrl);
+      } else {
+        renderPost(data.content);
+      }
       toast.success("Post generated! ✨");
     },
     onError: (error) => {
@@ -104,6 +110,31 @@ export default function Home() {
     reader.readAsDataURL(file);
   };
 
+  const renderPostWithAIImage = (content: Record<string, string>, imageUrl: string) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    canvas.width = 1080;
+    canvas.height = 1350;
+
+    // Load and draw AI-generated image
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      drawOverlay(ctx, canvas, content);
+    };
+    img.onerror = () => {
+      console.warn("Failed to load AI image, using fallback");
+      drawGradientBackground(ctx, canvas);
+      drawOverlay(ctx, canvas, content);
+    };
+    img.src = imageUrl;
+  };
+
   const renderPost = (content: Record<string, string>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -121,25 +152,25 @@ export default function Home() {
       const img = new Image();
       img.onload = () => {
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        drawOverlay(ctx, canvas, content, template);
+        drawOverlay(ctx, canvas, content);
       };
       img.onerror = () => {
         toast.error("Failed to load image");
-        drawGradientBackground(ctx, canvas, template);
-        drawOverlay(ctx, canvas, content, template);
+        drawGradientBackground(ctx, canvas);
+        drawOverlay(ctx, canvas, content);
       };
       img.src = uploadedImage;
     } else {
-      drawGradientBackground(ctx, canvas, template);
-      drawOverlay(ctx, canvas, content, template);
+      drawGradientBackground(ctx, canvas);
+      drawOverlay(ctx, canvas, content);
     }
   };
 
   const drawGradientBackground = (
     ctx: CanvasRenderingContext2D,
-    canvas: HTMLCanvasElement,
-    template: (typeof BUSINESS_TYPES)[keyof typeof BUSINESS_TYPES]
+    canvas: HTMLCanvasElement
   ) => {
+    const template = BUSINESS_TYPES[businessType as keyof typeof BUSINESS_TYPES];
     // Draw gradient background
     const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
     gradient.addColorStop(0, template.colors.primary);
@@ -151,14 +182,14 @@ export default function Home() {
   const drawOverlay = (
     ctx: CanvasRenderingContext2D,
     canvas: HTMLCanvasElement,
-    content: Record<string, string>,
-    template: (typeof BUSINESS_TYPES)[keyof typeof BUSINESS_TYPES]
+    content: Record<string, string>
   ) => {
     // Add dark overlay
     ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // Draw business name badge
+    const template = BUSINESS_TYPES[businessType as keyof typeof BUSINESS_TYPES];
     ctx.fillStyle = template.colors.primary;
     ctx.fillRect(0, 20, canvas.width, 80);
     ctx.fillStyle = "#FFFFFF";
@@ -377,7 +408,7 @@ export default function Home() {
 
               {/* Image Upload */}
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Upload Your Own Image</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Upload Your Own Image (Optional)</label>
                 <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center hover:border-slate-400 transition">
                   <input
                     ref={fileInputRef}
@@ -480,9 +511,9 @@ export default function Home() {
             <div className="bg-white rounded-2xl shadow-lg p-6">
               <h3 className="font-bold text-slate-900 mb-4">💡 Pro Tips</h3>
               <ul className="space-y-2 text-sm text-slate-600">
-                <li>✨ AI generates culturally-relevant content</li>
+                <li>✨ AI generates custom images for your business</li>
                 <li>🎯 Supports Shona & Ndebele for local reach</li>
-                <li>📱 Use your own images from phone</li>
+                <li>📱 Or upload your own images from phone</li>
                 <li>🌍 Test different languages for your audience</li>
                 <li>⏰ Post at peak engagement times</li>
               </ul>

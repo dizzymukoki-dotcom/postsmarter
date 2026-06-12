@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { publicProcedure, router } from "../_core/trpc";
 import { invokeLLM } from "../_core/llm";
+import { generateImage } from "../_core/imageGeneration";
 
 const generatePostInputSchema = z.object({
   businessName: z.string().min(1, "Business name required"),
@@ -21,12 +22,22 @@ export const contentRouter = router({
       const userPrompt = buildUserPrompt(input);
 
       try {
-        const response = await invokeLLM({
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
-          ],
-        });
+        // Build image prompt
+        const imagePrompt = buildImagePrompt(input);
+        
+        // Generate AI content and image in parallel
+        const [response, imageResult] = await Promise.all([
+          invokeLLM({
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrompt },
+            ],
+          }),
+          generateImage({ prompt: imagePrompt }).catch((err) => {
+            console.warn("[Image Generation] Failed:", err);
+            return null;
+          }),
+        ]);
 
         const messageContent = response.choices[0]?.message?.content;
         const content = typeof messageContent === "string" ? messageContent : JSON.stringify(messageContent) || "";
@@ -38,6 +49,7 @@ export const contentRouter = router({
           success: true,
           content: parsedContent,
           rawContent: content,
+          imageUrl: imageResult?.url,
         };
       } catch (error) {
         console.error("[Content Generation] LLM Error:", error);
@@ -108,7 +120,6 @@ export const contentRouter = router({
       return {
         success: true,
         posts,
-        count: posts.length,
       };
     }),
 });
@@ -152,6 +163,34 @@ Create social media posts that:
 5. Keep language natural and conversational`;
 }
 
+function buildImagePrompt(input: {
+  businessName: string;
+  businessType: string;
+  platform: "instagram" | "facebook" | "tiktok" | "whatsapp";
+  language: "english" | "shona" | "ndebele";
+  headline: string;
+  subheadline: string;
+  cta: string;
+  hashtags?: string;
+}): string {
+  const businessContext: Record<string, string> = {
+    "Restaurant / Fast Food": "delicious food, appetizing dishes, restaurant ambiance, pizza, burgers, fresh ingredients",
+    "Bar / Nightlife": "vibrant nightlife, party atmosphere, cocktails, entertainment, neon lights, dancing",
+    "Retail / Shopping": "modern retail store, shopping bags, stylish products, fashion, boutique",
+    "Finance / Banking": "professional finance, trust, security, growth charts, banking, wealth",
+    "Telecom / Tech": "modern technology, connectivity, digital innovation, smartphones, tech gadgets",
+    "Healthcare / Wellness": "wellness, health, professional healthcare environment, medical, fitness",
+    "Real Estate": "beautiful property, modern home, real estate showcase, architecture, luxury",
+    "Education / Training": "learning environment, students, education, knowledge, classroom, books",
+    "Travel / Tourism": "exotic destination, adventure, beautiful landscape, travel, beaches",
+    "Entertainment / Events": "exciting event, entertainment, celebration, fun, party, crowd",
+  };
+
+  const context = businessContext[input.businessType] || "professional business";
+  
+  return `Create a professional, high-quality promotional image for ${input.businessName}, a ${input.businessType} business. The image should feature ${context}. Style: modern, vibrant, professional, eye-catching, suitable for social media. The image should convey the message "${input.headline}" and "${input.subheadline}". Perfect for ${input.platform} marketing. High quality, professional photography style.`;
+}
+
 function buildUserPrompt(input: {
   businessName: string;
   businessType: string;
@@ -190,16 +229,16 @@ function parseAIResponse(content: string): Record<string, string> {
         caption: parsed.caption || content,
       };
     }
-  } catch (e) {
-    console.warn("[Content Parse] Failed to parse JSON, using raw content");
+  } catch (error) {
+    console.error("[Parse] JSON extraction failed:", error);
   }
 
-  // Fallback: return the raw content as caption
+  // Fallback parsing
   return {
     headline: "Amazing Offer",
-    subheadline: "Limited Time",
+    subheadline: "Limited Time Only",
     cta: "Learn More",
-    hashtags: "#ZimBusiness",
+    hashtags: "#ZimBusiness #SupportLocal",
     caption: content,
   };
 }
@@ -207,32 +246,32 @@ function parseAIResponse(content: string): Record<string, string> {
 function generateFallbackContent(input: {
   businessName: string;
   businessType: string;
-  platform: string;
-  language: string;
+  platform: "instagram" | "facebook" | "tiktok" | "whatsapp";
+  language: "english" | "shona" | "ndebele";
   headline: string;
   subheadline: string;
   cta: string;
   hashtags?: string;
 }): Record<string, string> {
-  const fallbackTemplates = {
+  const fallbacks = {
     english: {
-      caption: `Discover what makes ${input.businessName} special! ${input.subheadline}. ${input.cta} today!`,
+      caption: `Check out ${input.businessName}! We offer the best ${input.businessType.toLowerCase()} experience. Don't miss out!`,
     },
     shona: {
-      caption: `Muwone zvakaisvika kune ${input.businessName}! ${input.subheadline}. ${input.cta} nhasi!`,
+      caption: `Tarisa ${input.businessName}! Isu tinobvisa zvinhu zvakakwana. Regai musi!`,
     },
     ndebele: {
-      caption: `Bona okukulu kwe${input.businessName}! ${input.subheadline}. ${input.cta} namhlanje!`,
+      caption: `Jabulani ${input.businessName}! Sinabonisa izinto ezinhle. Ungalibali!`,
     },
   };
 
-  const template = fallbackTemplates[input.language as keyof typeof fallbackTemplates] || fallbackTemplates.english;
+  const fallback = fallbacks[input.language as keyof typeof fallbacks] || fallbacks.english;
 
   return {
     headline: input.headline,
     subheadline: input.subheadline,
     cta: input.cta,
     hashtags: input.hashtags || "#ZimBusiness #SupportLocal",
-    caption: template.caption,
+    caption: fallback.caption,
   };
 }
