@@ -1,6 +1,5 @@
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -44,7 +43,7 @@ const BUSINESS_TYPES = {
 export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [businessName, setBusinessName] = useState("Your Business");
+  const [businessName, setBusinessName] = useState("e.g. Chicken Inn Bulawayo");
   const [businessType, setBusinessType] = useState("Restaurant / Fast Food");
   const [platform, setPlatform] = useState("instagram");
   const [language, setLanguage] = useState("english");
@@ -52,10 +51,12 @@ export default function Home() {
   const [subheadline, setSubheadline] = useState("Limited Time Only");
   const [cta, setCta] = useState("SHOP NOW");
   const [hashtags, setHashtags] = useState("#ZimBusiness #SupportLocal #BuySmart");
+  const [brandColor, setBrandColor] = useState("#E63946");
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const [aiImageUrl, setAiImageUrl] = useState<string>("");
   const [generatedContent, setGeneratedContent] = useState<Record<string, string> | null>(null);
   const [uploadedImage, setUploadedImage] = useState<string>("");
+  const [currentStep, setCurrentStep] = useState(1);
 
   const generatePostMutation = trpc.content.generatePost.useMutation({
     onSuccess: (data) => {
@@ -75,7 +76,7 @@ export default function Home() {
   });
 
   const generatePost = async () => {
-    if (!businessName.trim()) {
+    if (!businessName.trim() || businessName === "e.g. Chicken Inn Bulawayo") {
       toast.error("Please enter a business name");
       return;
     }
@@ -120,7 +121,6 @@ export default function Home() {
     canvas.width = 1080;
     canvas.height = 1350;
 
-    // Load and draw AI-generated image
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.onload = () => {
@@ -142,13 +142,10 @@ export default function Home() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const template = BUSINESS_TYPES[businessType as keyof typeof BUSINESS_TYPES];
-
     canvas.width = 1080;
     canvas.height = 1350;
 
     if (uploadedImage) {
-      // Draw uploaded image as background
       const img = new Image();
       img.onload = () => {
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
@@ -170,11 +167,9 @@ export default function Home() {
     ctx: CanvasRenderingContext2D,
     canvas: HTMLCanvasElement
   ) => {
-    const template = BUSINESS_TYPES[businessType as keyof typeof BUSINESS_TYPES];
-    // Draw gradient background
     const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-    gradient.addColorStop(0, template.colors.primary);
-    gradient.addColorStop(1, template.colors.secondary);
+    gradient.addColorStop(0, brandColor);
+    gradient.addColorStop(1, adjustBrightness(brandColor, -30));
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   };
@@ -184,13 +179,10 @@ export default function Home() {
     canvas: HTMLCanvasElement,
     content: Record<string, string>
   ) => {
-    // Add dark overlay
     ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Draw business name badge
-    const template = BUSINESS_TYPES[businessType as keyof typeof BUSINESS_TYPES];
-    ctx.fillStyle = template.colors.primary;
+    ctx.fillStyle = brandColor;
     ctx.fillRect(0, 20, canvas.width, 80);
     ctx.fillStyle = "#FFFFFF";
     ctx.font = "bold 32px Arial, sans-serif";
@@ -198,7 +190,6 @@ export default function Home() {
     ctx.textBaseline = "middle";
     ctx.fillText(businessName.toUpperCase(), canvas.width / 2, 60);
 
-    // Draw headline
     ctx.fillStyle = "#FFFFFF";
     ctx.font = "bold 120px Arial, sans-serif";
     ctx.textAlign = "center";
@@ -217,18 +208,16 @@ export default function Home() {
       currentY += 120;
     });
 
-    // Draw subheadline
     ctx.font = "40px Arial, sans-serif";
     ctx.fillStyle = "#FFFFFF";
     ctx.fillText(content.subheadline || subheadline, canvas.width / 2, canvas.height * 0.65);
 
-    // Draw CTA button
     const buttonY = canvas.height * 0.75;
     const buttonWidth = 400;
     const buttonHeight = 70;
     const buttonX = (canvas.width - buttonWidth) / 2;
 
-    ctx.fillStyle = template.colors.primary;
+    ctx.fillStyle = brandColor;
     ctx.beginPath();
     ctx.roundRect(buttonX, buttonY, buttonWidth, buttonHeight, 35);
     ctx.fill();
@@ -240,14 +229,12 @@ export default function Home() {
     const ctaText = typeof content.cta === "string" ? content.cta : cta;
     ctx.fillText(ctaText, canvas.width / 2, buttonY + buttonHeight / 2);
 
-    // Draw hashtags
     ctx.font = "24px Arial, sans-serif";
     ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
     ctx.textAlign = "center";
     const hashtagText = typeof content.hashtags === "string" ? content.hashtags : hashtags;
     ctx.fillText(hashtagText, canvas.width / 2, canvas.height * 0.95);
 
-    // Convert to image
     const url = canvas.toDataURL("image/png");
     setPreviewUrl(url);
   };
@@ -275,53 +262,79 @@ export default function Home() {
     toast.success("Share functionality coming soon!");
   };
 
+  const adjustBrightness = (color: string, percent: number): string => {
+    const num = parseInt(color.replace("#", ""), 16);
+    const amt = Math.round(2.55 * percent);
+    const R = Math.max(0, Math.min(255, (num >> 16) + amt));
+    const G = Math.max(0, Math.min(255, (num >> 8 & 0x00FF) + amt));
+    const B = Math.max(0, Math.min(255, (num & 0x0000FF) + amt));
+    return "#" + (0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1);
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="min-h-screen bg-black text-white">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-white shadow-sm border-b border-slate-200">
+      <header className="sticky top-0 z-50 bg-black border-b border-yellow-400">
         <div className="container py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-pink-500 to-orange-500 rounded-lg flex items-center justify-center font-bold text-white text-sm">
-              PS
-            </div>
+            <div className="text-2xl font-bold">PS✦</div>
             <div>
-              <h1 className="font-bold text-lg text-slate-900">PostSmarter</h1>
-              <p className="text-xs text-slate-500">AI Social Media Generator</p>
+              <h1 className="font-bold text-lg">PostSmarter</h1>
+              <p className="text-xs text-gray-400">AI Creative Studio</p>
             </div>
           </div>
-          <Badge className="bg-orange-100 text-orange-700 border-orange-300">
-            <Sparkles className="w-3 h-3 mr-1" /> AI Powered
-          </Badge>
+          <div className="flex gap-4">
+            <button className="text-gray-300 hover:text-white text-sm">Pricing</button>
+            <button className="bg-yellow-400 text-black px-4 py-2 rounded font-bold text-sm">Get Started</button>
+          </div>
         </div>
       </header>
 
-      {/* Main Content */}
-      <div className="container py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Control Panel */}
-          <div className="space-y-6">
-            <div className="bg-white rounded-2xl shadow-lg p-8 space-y-6">
-              <h2 className="text-2xl font-bold text-slate-900">Create Your Post</h2>
+      {/* Hero Section */}
+      <section className="bg-black py-16 text-center border-b border-yellow-400">
+        <div className="container">
+          <p className="text-gray-500 text-sm tracking-widest mb-4">ZIMBABWE'S FIRST AI CREATIVE STUDIO</p>
+          <h2 className="text-6xl font-bold mb-2">
+            POST<br />
+            <span className="text-yellow-400" style={{ textShadow: "2px 2px 0px rgba(255,255,255,0.1)" }}>SMARTER</span>
+          </h2>
+          <p className="text-gray-400 mt-6 max-w-2xl mx-auto">
+            AI generates professional marketing graphics with Shona and Ndebele copy — ready to post in 30 seconds.
+          </p>
+        </div>
+      </section>
 
-              {/* Business Name */}
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Business Name</label>
+      {/* Main Content */}
+      <div className="container py-12">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Form Section */}
+          <div className="lg:col-span-2">
+            <div className="space-y-6">
+              {/* Step 1 */}
+              <div className="border-2 border-dashed border-yellow-400 p-6 rounded">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="bg-yellow-400 text-black w-8 h-8 rounded flex items-center justify-center font-bold text-sm">1</div>
+                  <label className="text-sm font-semibold text-gray-300 uppercase">Business Name</label>
+                </div>
                 <Input
                   value={businessName}
                   onChange={(e) => setBusinessName(e.target.value)}
-                  placeholder="e.g., Pizza Inn Bulawayo"
-                  className="bg-slate-50 border-slate-300 text-slate-900 placeholder:text-slate-400"
+                  placeholder="e.g. Chicken Inn Bulawayo"
+                  className="bg-gray-900 border-gray-700 text-white placeholder:text-gray-600"
                 />
               </div>
 
-              {/* Business Type */}
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Business Type</label>
+              {/* Step 2 */}
+              <div className="border-2 border-dashed border-pink-500 p-6 rounded">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="bg-pink-500 text-white w-8 h-8 rounded flex items-center justify-center font-bold text-sm">2</div>
+                  <label className="text-sm font-semibold text-gray-300 uppercase">Business Type</label>
+                </div>
                 <Select value={businessType} onValueChange={setBusinessType}>
-                  <SelectTrigger className="bg-slate-50 border-slate-300 text-slate-900">
+                  <SelectTrigger className="bg-gray-900 border-gray-700 text-white">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-white border-slate-300">
+                  <SelectContent className="bg-gray-900 border-gray-700">
                     {Object.keys(BUSINESS_TYPES).map((type) => (
                       <SelectItem key={type} value={type}>
                         {type}
@@ -331,126 +344,136 @@ export default function Home() {
                 </Select>
               </div>
 
-              {/* Platform */}
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Platform</label>
-                <Select value={platform} onValueChange={setPlatform}>
-                  <SelectTrigger className="bg-slate-50 border-slate-300 text-slate-900">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white border-slate-300">
-                    <SelectItem value="instagram">📸 Instagram</SelectItem>
-                    <SelectItem value="facebook">👥 Facebook</SelectItem>
-                    <SelectItem value="tiktok">🎵 TikTok</SelectItem>
-                    <SelectItem value="whatsapp">💬 WhatsApp</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Language */}
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Language</label>
-                <Select value={language} onValueChange={setLanguage}>
-                  <SelectTrigger className="bg-slate-50 border-slate-300 text-slate-900">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white border-slate-300">
-                    <SelectItem value="english">🇬🇧 English</SelectItem>
-                    <SelectItem value="shona">🇿🇼 Shona</SelectItem>
-                    <SelectItem value="ndebele">🇿🇼 Ndebele</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Headline */}
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Headline</label>
+              {/* Step 3 */}
+              <div className="border-2 border-dashed border-orange-500 p-6 rounded">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="bg-orange-500 text-white w-8 h-8 rounded flex items-center justify-center font-bold text-sm">3</div>
+                  <label className="text-sm font-semibold text-gray-300 uppercase">Headline</label>
+                </div>
                 <Input
                   value={headline}
                   onChange={(e) => setHeadline(e.target.value)}
-                  placeholder="e.g., AMAZING OFFER"
-                  className="bg-slate-50 border-slate-300 text-slate-900 placeholder:text-slate-400"
+                  placeholder="e.g. AMAZING OFFER"
+                  className="bg-gray-900 border-gray-700 text-white placeholder:text-gray-600"
                 />
               </div>
 
-              {/* Subheadline */}
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Subheadline</label>
+              {/* Step 4 - Brand Color */}
+              <div className="border-2 border-dashed border-red-500 p-6 rounded">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="bg-red-500 text-white w-8 h-8 rounded flex items-center justify-center font-bold text-sm">4</div>
+                  <label className="text-sm font-semibold text-gray-300 uppercase">Brand Color</label>
+                </div>
+                <div className="flex items-center gap-4">
+                  <input
+                    type="color"
+                    value={brandColor}
+                    onChange={(e) => setBrandColor(e.target.value)}
+                    className="w-16 h-12 rounded cursor-pointer"
+                  />
+                  <span className="text-gray-400">Selected: {brandColor}</span>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {Object.values(BUSINESS_TYPES).map((type, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setBrandColor(type.colors.primary)}
+                      className="w-8 h-8 rounded border-2 border-gray-600 hover:border-white transition"
+                      style={{ backgroundColor: type.colors.primary }}
+                      title={Object.keys(BUSINESS_TYPES)[idx]}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Step 5 - Additional Options */}
+              <div className="border-2 border-dashed border-green-500 p-6 rounded">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="bg-green-500 text-white w-8 h-8 rounded flex items-center justify-center font-bold text-sm">5</div>
+                  <label className="text-sm font-semibold text-gray-300 uppercase">Subheadline</label>
+                </div>
                 <Input
                   value={subheadline}
                   onChange={(e) => setSubheadline(e.target.value)}
-                  placeholder="e.g., Limited Time Only"
-                  className="bg-slate-50 border-slate-300 text-slate-900 placeholder:text-slate-400"
+                  placeholder="e.g. Limited Time Only"
+                  className="bg-gray-900 border-gray-700 text-white placeholder:text-gray-600"
                 />
               </div>
 
               {/* CTA */}
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Call to Action</label>
+              <div className="border-2 border-dashed border-purple-500 p-6 rounded">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="bg-purple-500 text-white w-8 h-8 rounded flex items-center justify-center font-bold text-sm">6</div>
+                  <label className="text-sm font-semibold text-gray-300 uppercase">Call to Action</label>
+                </div>
                 <Input
                   value={cta}
                   onChange={(e) => setCta(e.target.value)}
-                  placeholder="e.g., SHOP NOW"
-                  className="bg-slate-50 border-slate-300 text-slate-900 placeholder:text-slate-400"
+                  placeholder="e.g. SHOP NOW"
+                  className="bg-gray-900 border-gray-700 text-white placeholder:text-gray-600"
                 />
               </div>
 
               {/* Hashtags */}
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Hashtags</label>
+              <div className="border-2 border-dashed border-blue-500 p-6 rounded">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="bg-blue-500 text-white w-8 h-8 rounded flex items-center justify-center font-bold text-sm">7</div>
+                  <label className="text-sm font-semibold text-gray-300 uppercase">Hashtags</label>
+                </div>
                 <Textarea
                   value={hashtags}
                   onChange={(e) => setHashtags(e.target.value)}
-                  placeholder="e.g., #ZimBusiness #SupportLocal"
-                  className="bg-slate-50 border-slate-300 text-slate-900 placeholder:text-slate-400 min-h-20"
+                  placeholder="e.g. #ZimBusiness #SupportLocal"
+                  className="bg-gray-900 border-gray-700 text-white placeholder:text-gray-600 min-h-20"
                 />
               </div>
 
               {/* Image Upload */}
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Upload Your Own Image (Optional)</label>
-                <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center hover:border-slate-400 transition">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    className="hidden"
-                  />
-                  {uploadedImage ? (
-                    <div className="space-y-2">
-                      <img src={uploadedImage} alt="Uploaded" className="w-full h-32 object-cover rounded" />
-                      <Button
-                        onClick={() => {
-                          setUploadedImage("");
-                          if (fileInputRef.current) fileInputRef.current.value = "";
-                        }}
-                        variant="ghost"
-                        size="sm"
-                        className="w-full text-red-600 hover:text-red-700"
-                      >
-                        <X className="w-4 h-4 mr-2" />
-                        Remove Image
-                      </Button>
-                    </div>
-                  ) : (
-                    <Button
-                      onClick={() => fileInputRef.current?.click()}
-                      variant="ghost"
-                      className="w-full text-slate-600 hover:text-slate-900"
-                    >
-                      <Upload className="w-5 h-5 mr-2" />
-                      Click to upload image from phone
-                    </Button>
-                  )}
+              <div className="border-2 border-dashed border-indigo-500 p-6 rounded">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="bg-indigo-500 text-white w-8 h-8 rounded flex items-center justify-center font-bold text-sm">8</div>
+                  <label className="text-sm font-semibold text-gray-300 uppercase">Upload Image (Optional)</label>
                 </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                />
+                {uploadedImage ? (
+                  <div className="space-y-2">
+                    <img src={uploadedImage} alt="Uploaded" className="w-full h-32 object-cover rounded" />
+                    <Button
+                      onClick={() => {
+                        setUploadedImage("");
+                        if (fileInputRef.current) fileInputRef.current.value = "";
+                      }}
+                      variant="ghost"
+                      size="sm"
+                      className="w-full text-red-400 hover:text-red-300"
+                    >
+                      <X className="w-4 h-4 mr-2" />
+                      Remove Image
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    onClick={() => fileInputRef.current?.click()}
+                    variant="ghost"
+                    className="w-full text-gray-400 hover:text-white border border-gray-700"
+                  >
+                    <Upload className="w-5 h-5 mr-2" />
+                    Click to upload image from phone
+                  </Button>
+                )}
               </div>
 
               {/* Generate Button */}
               <Button
                 onClick={generatePost}
                 disabled={generatePostMutation.isPending}
-                className="w-full bg-gradient-to-r from-pink-500 to-orange-500 hover:from-pink-600 hover:to-orange-600 text-white font-bold py-6 text-lg rounded-xl"
+                className="w-full bg-yellow-400 hover:bg-yellow-500 text-black font-bold py-6 text-lg rounded"
               >
                 {generatePostMutation.isPending ? (
                   <>
@@ -460,63 +483,53 @@ export default function Home() {
                 ) : (
                   <>
                     <Sparkles className="w-5 h-5 mr-2" />
-                    Generate Post
+                    Continue →
                   </>
                 )}
               </Button>
             </div>
           </div>
 
-          {/* Preview Panel */}
-          <div className="space-y-6">
-            <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-              {previewUrl ? (
-                <div className="space-y-4 p-6">
-                  <img src={previewUrl} alt="Generated Post" className="w-full rounded-xl shadow-md" />
-                  {generatedContent && (
-                    <div className="bg-slate-50 p-4 rounded-lg space-y-2">
-                      <p className="text-xs font-semibold text-slate-600">AI-Generated Caption:</p>
-                      <p className="text-sm text-slate-700">{generatedContent.caption || generatedContent.headline}</p>
+          {/* Preview Section */}
+          <div className="lg:col-span-1">
+            <div className="sticky top-24 space-y-4">
+              <div className="bg-gray-900 rounded border-2 border-yellow-400 overflow-hidden">
+                {previewUrl ? (
+                  <div className="space-y-4 p-4">
+                    <img src={previewUrl} alt="Generated Post" className="w-full rounded" />
+                    {generatedContent && (
+                      <div className="bg-gray-800 p-3 rounded text-sm space-y-2">
+                        <p className="text-xs font-semibold text-gray-400">AI-Generated Caption:</p>
+                        <p className="text-gray-300 text-xs">{generatedContent.caption || generatedContent.headline}</p>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        onClick={downloadPost}
+                        className="bg-gray-800 hover:bg-gray-700 text-white font-semibold py-2 text-sm rounded flex items-center justify-center gap-1"
+                      >
+                        <Download className="w-4 h-4" />
+                        Download
+                      </Button>
+                      <Button
+                        onClick={sharePost}
+                        className="bg-gray-800 hover:bg-gray-700 text-white font-semibold py-2 text-sm rounded flex items-center justify-center gap-1"
+                      >
+                        <Share2 className="w-4 h-4" />
+                        Share
+                      </Button>
                     </div>
-                  )}
-                  <div className="grid grid-cols-2 gap-3">
-                    <Button
-                      onClick={downloadPost}
-                      className="bg-slate-900 hover:bg-slate-800 text-white font-semibold py-3 rounded-lg flex items-center justify-center gap-2"
-                    >
-                      <Download className="w-4 h-4" />
-                      Download
-                    </Button>
-                    <Button
-                      onClick={sharePost}
-                      className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 rounded-lg flex items-center justify-center gap-2"
-                    >
-                      <Share2 className="w-4 h-4" />
-                      Share
-                    </Button>
                   </div>
-                </div>
-              ) : (
-                <div className="h-96 flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200">
-                  <div className="text-center">
-                    <Sparkles className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                    <p className="text-slate-500 font-semibold">Your post will appear here</p>
-                    <p className="text-slate-400 text-sm mt-2">Fill in the details and click Generate</p>
+                ) : (
+                  <div className="h-64 flex items-center justify-center bg-gray-800">
+                    <div className="text-center">
+                      <Sparkles className="w-12 h-12 text-gray-600 mx-auto mb-2" />
+                      <p className="text-gray-400 font-semibold text-sm">Your post preview</p>
+                      <p className="text-gray-600 text-xs mt-1">will appear here</p>
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
-
-            {/* Quick Tips */}
-            <div className="bg-white rounded-2xl shadow-lg p-6">
-              <h3 className="font-bold text-slate-900 mb-4">💡 Pro Tips</h3>
-              <ul className="space-y-2 text-sm text-slate-600">
-                <li>✨ AI generates custom images for your business</li>
-                <li>🎯 Supports Shona & Ndebele for local reach</li>
-                <li>📱 Or upload your own images from phone</li>
-                <li>🌍 Test different languages for your audience</li>
-                <li>⏰ Post at peak engagement times</li>
-              </ul>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -526,9 +539,9 @@ export default function Home() {
       <canvas ref={canvasRef} style={{ display: "none" }} />
 
       {/* Footer */}
-      <footer className="border-t border-slate-200 bg-white mt-12 py-6">
-        <div className="container text-center text-slate-500 text-sm">
-          <p>PostSmarter © 2026 • AI-powered social media content for Zimbabwe & SADC • Perfect for agencies and businesses</p>
+      <footer className="border-t border-yellow-400 bg-black py-6 mt-12">
+        <div className="container text-center text-gray-500 text-xs">
+          <p>PostSmarter © 2026 • Zimbabwe's First AI Creative Studio</p>
         </div>
       </footer>
     </div>
