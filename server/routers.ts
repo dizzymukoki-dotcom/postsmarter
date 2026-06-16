@@ -3,6 +3,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 import { contentRouter } from "./routers/content";
+import { billingRouter } from "./routers/billing";
 import type { TrpcContext } from "./_core/context";
 
 export const appRouter = router({
@@ -19,6 +20,7 @@ export const appRouter = router({
     }),
   }),
   content: contentRouter,
+  billing: billingRouter,
 
   // TODO: add feature routers here
 });

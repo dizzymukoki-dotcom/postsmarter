@@ -1,7 +1,8 @@
 import { z } from "zod";
-import { publicProcedure, router } from "../_core/trpc";
+import { publicProcedure, protectedProcedure, router } from "../_core/trpc";
 import { invokeLLM } from "../_core/llm";
 import { generateImage } from "../_core/imageGeneration";
+import { canUserGeneratePosts, trackPostGeneration } from "../db-billing";
 
 const generatePostInputSchema = z.object({
   businessName: z.string().min(1, "Business name required"),
@@ -15,9 +16,14 @@ const generatePostInputSchema = z.object({
 });
 
 export const contentRouter = router({
-  generatePost: publicProcedure
+  generatePost: protectedProcedure
     .input(generatePostInputSchema)
-    .mutation(async ({ input }: { input: z.infer<typeof generatePostInputSchema> }) => {
+    .mutation(async ({ ctx, input }: { ctx: any; input: z.infer<typeof generatePostInputSchema> }) => {
+      // Check if user can generate posts
+      const canGenerate = await canUserGeneratePosts(ctx.user.id);
+      if (!canGenerate.canGenerate) {
+        throw new Error(canGenerate.reason || "Cannot generate posts");
+      }
       const systemPrompt = buildSystemPrompt(input.language, input.businessType);
       const userPrompt = buildUserPrompt(input);
 
@@ -45,6 +51,9 @@ export const contentRouter = router({
         // Parse the AI response to extract structured data
         const parsedContent = parseAIResponse(content);
 
+        // Track usage
+        await trackPostGeneration(ctx.user.id, 1);
+
         return {
           success: true,
           content: parsedContent,
@@ -56,6 +65,10 @@ export const contentRouter = router({
         
         // Fallback to template-based generation if LLM fails
         const fallbackContent = generateFallbackContent(input);
+        
+        // Track usage
+        await trackPostGeneration(ctx.user.id, 1);
+        
         return {
           success: true,
           content: fallbackContent,

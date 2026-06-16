@@ -284,8 +284,8 @@ export default function Home() {
             </div>
           </div>
           <div className="flex gap-4">
-            <button className="text-gray-300 hover:text-white text-sm">Pricing</button>
-            <button className="bg-yellow-400 text-black px-4 py-2 rounded font-bold text-sm">Get Started</button>
+            <a href="/pricing" className="text-gray-300 hover:text-white text-sm">Pricing</a>
+            <a href="/dashboard" className="bg-yellow-400 text-black px-4 py-2 rounded font-bold text-sm hover:bg-yellow-500 transition">Dashboard</a>
           </div>
         </div>
       </header>

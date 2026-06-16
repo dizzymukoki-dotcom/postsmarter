@@ -15,12 +15,36 @@ vi.mock("../_core/imageGeneration", () => ({
 import { invokeLLM } from "../_core/llm";
 import { generateImage } from "../_core/imageGeneration";
 
+// Mock billing functions
+vi.mock("../db-billing", () => ({
+  canUserGeneratePosts: vi.fn(() => Promise.resolve({ canGenerate: true })),
+  trackPostGeneration: vi.fn(() => Promise.resolve()),
+}));
+
 const mockInvokeLLM = invokeLLM as ReturnType<typeof vi.fn>;
 const mockGenerateImage = generateImage as ReturnType<typeof vi.fn>;
 
-function createMockContext(): TrpcContext {
+import { canUserGeneratePosts, trackPostGeneration } from "../db-billing";
+const mockCanGenerate = canUserGeneratePosts as ReturnType<typeof vi.fn>;
+const mockTrackUsage = trackPostGeneration as ReturnType<typeof vi.fn>;
+
+type AuthenticatedUser = NonNullable<TrpcContext["user"]>;
+
+function createMockContext(userId: number = 1): TrpcContext {
+  const user: AuthenticatedUser = {
+    id: userId,
+    openId: `test-user-${userId}`,
+    email: `test${userId}@example.com`,
+    name: `Test User ${userId}`,
+    loginMethod: "manus",
+    role: "user",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    lastSignedIn: new Date(),
+  };
+
   return {
-    user: null,
+    user,
     req: {
       protocol: "https",
       headers: {},
@@ -33,7 +57,9 @@ describe("contentRouter", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGenerateImage.mockResolvedValue({ url: "https://example.com/image.png" });
-  });
+    mockCanGenerate.mockResolvedValue({ canGenerate: true });
+    mockTrackUsage.mockResolvedValue(undefined);
+  })
 
   describe("generatePost", () => {
     it("should generate a post with valid input", async () => {
@@ -207,6 +233,7 @@ describe("contentRouter", () => {
         });
         expect.fail("Should have thrown validation error");
       } catch (error: any) {
+        // Empty businessName should trigger validation error
         expect(error.code).toBe("BAD_REQUEST");
       }
     });
@@ -312,6 +339,7 @@ describe("contentRouter", () => {
         });
         expect.fail("Should have thrown validation error");
       } catch (error: any) {
+        // Count > 10 should trigger validation error
         expect(error.code).toBe("BAD_REQUEST");
       }
     });
