@@ -344,10 +344,28 @@ export default function Home() {
                 </Select>
               </div>
 
-              {/* Step 3 */}
+              {/* Step 3 - Language */}
+              <div className="border-2 border-dashed border-cyan-500 p-6 rounded">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="bg-cyan-500 text-white w-8 h-8 rounded flex items-center justify-center font-bold text-sm">3</div>
+                  <label className="text-sm font-semibold text-gray-300 uppercase">Language</label>
+                </div>
+                <Select value={language} onValueChange={setLanguage}>
+                  <SelectTrigger className="bg-gray-900 border-gray-700 text-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-gray-900 border-gray-700">
+                    <SelectItem value="english">English</SelectItem>
+                    <SelectItem value="shona">Shona (ChiShona)</SelectItem>
+                    <SelectItem value="ndebele">Ndebele (Sindebele)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Step 4 - Headline */}
               <div className="border-2 border-dashed border-orange-500 p-6 rounded">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="bg-orange-500 text-white w-8 h-8 rounded flex items-center justify-center font-bold text-sm">3</div>
+                  <div className="bg-orange-500 text-white w-8 h-8 rounded flex items-center justify-center font-bold text-sm">4</div>
                   <label className="text-sm font-semibold text-gray-300 uppercase">Headline</label>
                 </div>
                 <Input
@@ -358,10 +376,10 @@ export default function Home() {
                 />
               </div>
 
-              {/* Step 4 - Brand Color */}
+              {/* Step 5 - Brand Color */}
               <div className="border-2 border-dashed border-red-500 p-6 rounded">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="bg-red-500 text-white w-8 h-8 rounded flex items-center justify-center font-bold text-sm">4</div>
+                  <div className="bg-red-500 text-white w-8 h-8 rounded flex items-center justify-center font-bold text-sm">5</div>
                   <label className="text-sm font-semibold text-gray-300 uppercase">Brand Color</label>
                 </div>
                 <div className="flex items-center gap-4">
@@ -386,10 +404,10 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Step 5 - Additional Options */}
+              {/* Step 6 - Additional Options */}
               <div className="border-2 border-dashed border-green-500 p-6 rounded">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="bg-green-500 text-white w-8 h-8 rounded flex items-center justify-center font-bold text-sm">5</div>
+                  <div className="bg-green-500 text-white w-8 h-8 rounded flex items-center justify-center font-bold text-sm">6</div>
                   <label className="text-sm font-semibold text-gray-300 uppercase">Subheadline</label>
                 </div>
                 <Input
@@ -400,10 +418,10 @@ export default function Home() {
                 />
               </div>
 
-              {/* CTA */}
+              {/* Step 7 - CTA */}
               <div className="border-2 border-dashed border-purple-500 p-6 rounded">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="bg-purple-500 text-white w-8 h-8 rounded flex items-center justify-center font-bold text-sm">6</div>
+                  <div className="bg-purple-500 text-white w-8 h-8 rounded flex items-center justify-center font-bold text-sm">7</div>
                   <label className="text-sm font-semibold text-gray-300 uppercase">Call to Action</label>
                 </div>
                 <Input
@@ -414,10 +432,10 @@ export default function Home() {
                 />
               </div>
 
-              {/* Hashtags */}
+              {/* Step 8 - Hashtags */}
               <div className="border-2 border-dashed border-blue-500 p-6 rounded">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="bg-blue-500 text-white w-8 h-8 rounded flex items-center justify-center font-bold text-sm">7</div>
+                  <div className="bg-blue-500 text-white w-8 h-8 rounded flex items-center justify-center font-bold text-sm">8</div>
                   <label className="text-sm font-semibold text-gray-300 uppercase">Hashtags</label>
                 </div>
                 <Textarea
@@ -428,10 +446,10 @@ export default function Home() {
                 />
               </div>
 
-              {/* Image Upload */}
+              {/* Step 9 - Image Upload */}
               <div className="border-2 border-dashed border-indigo-500 p-6 rounded">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="bg-indigo-500 text-white w-8 h-8 rounded flex items-center justify-center font-bold text-sm">8</div>
+                  <div className="bg-indigo-500 text-white w-8 h-8 rounded flex items-center justify-center font-bold text-sm">9</div>
                   <label className="text-sm font-semibold text-gray-300 uppercase">Upload Image (Optional)</label>
                 </div>
                 <input
