@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { publicProcedure, protectedProcedure, router } from "../_core/trpc";
+import { publicProcedure, router } from "../_core/trpc";
 import { invokeLLM } from "../_core/llm";
 import { generateImage } from "../_core/imageGeneration";
 import { canUserGeneratePosts, trackPostGeneration } from "../db-billing";
@@ -16,14 +16,17 @@ const generatePostInputSchema = z.object({
 });
 
 export const contentRouter = router({
-  generatePost: protectedProcedure
+  generatePost: publicProcedure
     .input(generatePostInputSchema)
     .mutation(async ({ ctx, input }: { ctx: any; input: z.infer<typeof generatePostInputSchema> }) => {
-      // Check if user can generate posts
-      const canGenerate = await canUserGeneratePosts(ctx.user.id);
-      if (!canGenerate.canGenerate) {
-        throw new Error(canGenerate.reason || "Cannot generate posts");
+      // Check subscription limits only if user is logged in
+      if (ctx.user) {
+        const canGenerate = await canUserGeneratePosts(ctx.user.id);
+        if (!canGenerate.canGenerate) {
+          throw new Error(canGenerate.reason || "Cannot generate posts");
+        }
       }
+
       const systemPrompt = buildSystemPrompt(input.language, input.businessType);
       const userPrompt = buildUserPrompt(input);
 
@@ -51,8 +54,10 @@ export const contentRouter = router({
         // Parse the AI response to extract structured data
         const parsedContent = parseAIResponse(content);
 
-        // Track usage
-        await trackPostGeneration(ctx.user.id, 1);
+        // Track usage if user is logged in
+        if (ctx.user) {
+          await trackPostGeneration(ctx.user.id, 1);
+        }
 
         return {
           success: true,
@@ -66,8 +71,10 @@ export const contentRouter = router({
         // Fallback to template-based generation if LLM fails
         const fallbackContent = generateFallbackContent(input);
         
-        // Track usage
-        await trackPostGeneration(ctx.user.id, 1);
+        // Track usage if user is logged in
+        if (ctx.user) {
+          await trackPostGeneration(ctx.user.id, 1);
+        }
         
         return {
           success: true,
@@ -88,46 +95,68 @@ export const contentRouter = router({
         count: z.number().min(1).max(10),
       })
     )
-    .mutation(async ({ input }: { input: { businessName: string; businessType: string; platform: "instagram" | "facebook" | "tiktok" | "whatsapp"; language: "english" | "shona" | "ndebele"; count: number } }) => {
-      const posts = [];
-      
-      for (let i = 0; i < input.count; i++) {
-        const systemPrompt = buildSystemPrompt(input.language, input.businessType);
-        const userPrompt = `Generate a unique ${input.platform} post for ${input.businessName} (${input.businessType}). 
-        Make it different from previous posts. Include headline, subheadline, call-to-action, and hashtags.
-        Post ${i + 1} of ${input.count}.`;
+    .mutation(async ({ ctx, input }: { ctx: any; input: any }) => {
+      // Check subscription limits only if user is logged in
+      if (ctx.user) {
+        const canGenerate = await canUserGeneratePosts(ctx.user.id);
+        if (!canGenerate.canGenerate) {
+          throw new Error(canGenerate.reason || "Cannot generate posts");
+        }
+      }
 
+      const posts = [];
+
+      for (let i = 0; i < input.count; i++) {
         try {
-          const response = await invokeLLM({
-            messages: [
-              { role: "system", content: systemPrompt },
-              { role: "user", content: userPrompt },
-            ],
-          });
+          const systemPrompt = buildSystemPrompt(input.language, input.businessType);
+          const userPrompt = `Generate a unique social media post for ${input.businessName} (${input.businessType}) for ${input.platform}. This is variation ${i + 1} of ${input.count}. Make it different from previous variations.`;
+
+          const imagePrompt = `Professional marketing image for ${input.businessName} (${input.businessType}). Variation ${i + 1}. High quality, modern design.`;
+
+          const [response, imageResult] = await Promise.all([
+            invokeLLM({
+              messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userPrompt },
+              ],
+            }),
+            generateImage({ prompt: imagePrompt }).catch(() => null),
+          ]);
 
           const messageContent = response.choices[0]?.message?.content;
           const content = typeof messageContent === "string" ? messageContent : JSON.stringify(messageContent) || "";
+          const parsedContent = parseAIResponse(content);
+
           posts.push({
-            id: `post-${i + 1}`,
-            content: parseAIResponse(content),
+            success: true,
+            content: parsedContent,
             rawContent: content,
+            imageUrl: imageResult?.url,
           });
         } catch (error) {
-          console.error(`[Bulk Generation] Error generating post ${i + 1}:`, error);
+          console.error(`[Bulk Generation] Error on post ${i + 1}:`, error);
+          const fallbackContent = generateFallbackContent({
+            businessName: input.businessName,
+            businessType: input.businessType,
+            platform: input.platform,
+            language: input.language,
+            headline: `Offer ${i + 1}`,
+            subheadline: "Limited Time",
+            cta: "Shop Now",
+          });
+
           posts.push({
-            id: `post-${i + 1}`,
-            content: generateFallbackContent({
-              businessName: input.businessName,
-              businessType: input.businessType,
-              platform: input.platform,
-              language: input.language,
-              headline: `Post ${i + 1}`,
-              subheadline: "Check this out",
-              cta: "Learn More",
-            }),
+            success: true,
+            content: fallbackContent,
+            rawContent: JSON.stringify(fallbackContent),
             isFallback: true,
           });
         }
+      }
+
+      // Track usage if user is logged in
+      if (ctx.user) {
+        await trackPostGeneration(ctx.user.id, input.count);
       }
 
       return {
@@ -138,153 +167,110 @@ export const contentRouter = router({
 });
 
 // Helper functions
-
 function buildSystemPrompt(language: string, businessType: string): string {
-  const languageInstructions = {
-    english: `You are a social media expert creating engaging posts in English.
-    Focus on clear, punchy messaging that drives engagement and conversions.`,
-    shona: `You are an expert in Zimbabwean Shona culture and language. Create authentic, culturally-relevant social media posts in Shona.
-    Use natural Shona expressions and idioms. Understand local business practices and consumer behavior.
-    Shona is spoken in Zimbabwe and parts of Botswana. Use appropriate tone for the business type.`,
-    ndebele: `You are an expert in Zimbabwean Ndebele culture and language. Create authentic, culturally-relevant social media posts in Ndebele.
-    Use natural Ndebele expressions and idioms. Understand local business practices and consumer behavior.
-    Ndebele is spoken in Zimbabwe. Use appropriate tone for the business type.`,
+  const languageGuides: Record<string, string> = {
+    english: "Create engaging, professional social media content in English.",
+    shona: "Create engaging social media content in Shona language. Use natural Shona expressions and cultural references relevant to Zimbabwe.",
+    ndebele: "Create engaging social media content in Ndebele language. Use natural Ndebele expressions and cultural references relevant to Zimbabwe.",
   };
 
-  const businessContext = {
-    "Restaurant / Fast Food": "Focus on food quality, taste, freshness, and convenience. Highlight special offers and delivery.",
-    "Bar / Nightlife": "Emphasize ambiance, entertainment, special events, and social experience.",
-    "Retail / Shopping": "Highlight products, quality, prices, and shopping convenience.",
-    "Finance / Banking": "Emphasize trust, security, financial growth, and customer service.",
-    "Telecom / Tech": "Focus on connectivity, innovation, reliability, and customer support.",
-    "Healthcare / Wellness": "Emphasize care, health benefits, professional expertise, and customer wellbeing.",
-    "Real Estate": "Highlight property features, location benefits, investment potential, and lifestyle.",
-    "Education / Training": "Focus on learning outcomes, career advancement, expertise, and student success.",
-    "Travel / Tourism": "Emphasize adventure, experiences, destinations, and value for money.",
-    "Entertainment / Events": "Highlight entertainment value, exclusivity, fun, and memorable experiences.",
-  };
+  return `You are an expert social media copywriter specializing in ${businessType} marketing for ${language.charAt(0).toUpperCase() + language.slice(1)} audiences in Zimbabwe.
 
-  return `${languageInstructions[language as keyof typeof languageInstructions] || languageInstructions.english}
+${languageGuides[language] || languageGuides.english}
 
-Business Context: ${businessContext[businessType as keyof typeof businessContext] || "General business"}
-
-Create social media posts that:
-1. Are culturally appropriate and authentic
-2. Drive engagement and conversions
-3. Include a compelling headline, subheadline, call-to-action, and hashtags
-4. Are formatted as JSON with keys: headline, subheadline, cta, hashtags, caption
-5. Keep language natural and conversational`;
+Generate compelling, culturally-appropriate social media posts that drive engagement and conversions. Format your response as valid JSON with these fields:
+- headline: Catchy main message (max 10 words)
+- subheadline: Supporting message (max 15 words)
+- cta: Clear call-to-action (max 8 words)
+- hashtags: Array of relevant hashtags (5-8 tags)
+- caption: Full post copy (100-200 words)`;
 }
 
-function buildImagePrompt(input: {
-  businessName: string;
-  businessType: string;
-  platform: "instagram" | "facebook" | "tiktok" | "whatsapp";
-  language: "english" | "shona" | "ndebele";
-  headline: string;
-  subheadline: string;
-  cta: string;
-  hashtags?: string;
-}): string {
-  const businessContext: Record<string, string> = {
-    "Restaurant / Fast Food": "delicious food, appetizing dishes, restaurant ambiance, pizza, burgers, fresh ingredients",
-    "Bar / Nightlife": "vibrant nightlife, party atmosphere, cocktails, entertainment, neon lights, dancing",
-    "Retail / Shopping": "modern retail store, shopping bags, stylish products, fashion, boutique",
-    "Finance / Banking": "professional finance, trust, security, growth charts, banking, wealth",
-    "Telecom / Tech": "modern technology, connectivity, digital innovation, smartphones, tech gadgets",
-    "Healthcare / Wellness": "wellness, health, professional healthcare environment, medical, fitness",
-    "Real Estate": "beautiful property, modern home, real estate showcase, architecture, luxury",
-    "Education / Training": "learning environment, students, education, knowledge, classroom, books",
-    "Travel / Tourism": "exotic destination, adventure, beautiful landscape, travel, beaches",
-    "Entertainment / Events": "exciting event, entertainment, celebration, fun, party, crowd",
-  };
-
-  const context = businessContext[input.businessType] || "professional business";
-  
-  return `Create a professional, high-quality promotional image for ${input.businessName}, a ${input.businessType} business. The image should feature ${context}. Style: modern, vibrant, professional, eye-catching, suitable for social media. The image should convey the message "${input.headline}" and "${input.subheadline}". Perfect for ${input.platform} marketing. High quality, professional photography style.`;
-}
-
-function buildUserPrompt(input: {
-  businessName: string;
-  businessType: string;
-  platform: "instagram" | "facebook" | "tiktok" | "whatsapp";
-  language: "english" | "shona" | "ndebele";
-  headline: string;
-  subheadline: string;
-  cta: string;
-  hashtags?: string;
-}): string {
-  return `Create a ${input.platform} post for:
+function buildUserPrompt(input: z.infer<typeof generatePostInputSchema>): string {
+  return `Create a social media post for:
 Business: ${input.businessName}
 Type: ${input.businessType}
+Platform: ${input.platform}
 Language: ${input.language}
+Headline: ${input.headline}
+Subheadline: ${input.subheadline}
+CTA: ${input.cta}
+Hashtags: ${input.hashtags || "auto-generate relevant ones"}
 
-Use these as inspiration:
-- Headline: ${input.headline}
-- Subheadline: ${input.subheadline}
-- Call-to-Action: ${input.cta}
-- Hashtags: ${input.hashtags || "auto-generate relevant ones"}
-
-Generate an authentic, engaging post that resonates with local audiences. Return as JSON.`;
+Make it engaging, professional, and optimized for ${input.platform}. Ensure cultural relevance for Zimbabwe.`;
 }
 
-function parseAIResponse(content: string): Record<string, string> {
+function buildImagePrompt(input: z.infer<typeof generatePostInputSchema>): string {
+  return `Professional marketing image for ${input.businessName} (${input.businessType}). ${input.headline}. High quality, modern design, suitable for ${input.platform}. Include relevant visual elements that appeal to ${input.language}-speaking audiences in Zimbabwe.`;
+}
+
+function parseAIResponse(content: string): any {
   try {
-    // Try to extract JSON from the response
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      return {
-        headline: parsed.headline || "Amazing Offer",
-        subheadline: parsed.subheadline || "Limited Time",
-        cta: parsed.cta || "Learn More",
-        hashtags: parsed.hashtags || "#ZimBusiness",
-        caption: parsed.caption || content,
-      };
-    }
+    // Try to extract JSON from markdown code blocks first
+    const jsonMatch = content.match(/```json\n([\s\S]*?)\n```/);
+    const jsonStr = jsonMatch ? jsonMatch[1] : content;
+    
+    const parsed = JSON.parse(jsonStr);
+    
+    return {
+      headline: String(parsed.headline || ""),
+      subheadline: String(parsed.subheadline || ""),
+      cta: String(parsed.cta || ""),
+      hashtags: Array.isArray(parsed.hashtags) ? parsed.hashtags : (typeof parsed.hashtags === "string" ? parsed.hashtags.split(" ") : []),
+      caption: String(parsed.caption || ""),
+    };
   } catch (error) {
-    console.error("[Parse] JSON extraction failed:", error);
+    console.error("[Parse Error]", error);
+    return generateFallbackContent({
+      businessName: "Your Business",
+      businessType: "Business",
+      platform: "instagram",
+      language: "english",
+      headline: "Amazing Offer",
+      subheadline: "Limited Time",
+      cta: "Shop Now",
+    });
   }
-
-  // Fallback parsing
-  return {
-    headline: "Amazing Offer",
-    subheadline: "Limited Time Only",
-    cta: "Learn More",
-    hashtags: "#ZimBusiness #SupportLocal",
-    caption: content,
-  };
 }
 
-function generateFallbackContent(input: {
-  businessName: string;
-  businessType: string;
-  platform: "instagram" | "facebook" | "tiktok" | "whatsapp";
-  language: "english" | "shona" | "ndebele";
-  headline: string;
-  subheadline: string;
-  cta: string;
-  hashtags?: string;
-}): Record<string, string> {
-  const fallbacks = {
-    english: {
-      caption: `Check out ${input.businessName}! We offer the best ${input.businessType.toLowerCase()} experience. Don't miss out!`,
+function generateFallbackContent(input: any): any {
+  const templates: Record<string, any> = {
+    "Restaurant / Fast Food": {
+      headline: "Hungry? We've Got You!",
+      subheadline: "Fresh, delicious food ready now",
+      cta: "Order Today",
+      caption: `Craving something delicious? ${input.businessName} is serving up the best ${input.businessType.toLowerCase()} in town! Fresh ingredients, amazing flavors, and fast service. Your taste buds will thank you! 🍽️`,
+      hashtags: ["#FoodLover", "#LocalEats", "#FreshFood", "#YumYum"],
     },
-    shona: {
-      caption: `Tarisa ${input.businessName}! Isu tinobvisa zvinhu zvakakwana. Regai musi!`,
+    "Retail / Shopping": {
+      headline: "Shop Smart, Save Big",
+      subheadline: "Exclusive deals just for you",
+      cta: "Shop Now",
+      caption: `Discover amazing products at ${input.businessName}! From fashion to essentials, we have everything you need. Quality products at unbeatable prices. Don't miss out! 🛍️`,
+      hashtags: ["#Shopping", "#Deals", "#Fashion", "#ShopLocal"],
     },
-    ndebele: {
-      caption: `Jabulani ${input.businessName}! Sinabonisa izinto ezinhle. Ungalibali!`,
+    "Nightlife / Entertainment": {
+      headline: "Your Night Starts Here",
+      subheadline: "The best vibes in town",
+      cta: "Reserve Now",
+      caption: `Looking for an unforgettable night out? ${input.businessName} is the place to be! Great music, amazing atmosphere, and good company. Come celebrate with us! 🎉`,
+      hashtags: ["#Nightlife", "#Entertainment", "#Party", "#GoodTimes"],
+    },
+    default: {
+      headline: input.headline || "Amazing Offer",
+      subheadline: input.subheadline || "Limited Time Only",
+      cta: input.cta || "Shop Now",
+      caption: `Check out ${input.businessName}! We offer the best ${input.businessType.toLowerCase()} experience. Don't miss out on our special offers!`,
+      hashtags: ["#Business", "#LocalSupport", "#Quality", "#BestDeal"],
     },
   };
 
-  const fallback = fallbacks[input.language as keyof typeof fallbacks] || fallbacks.english;
-
+  const template = templates[input.businessType] || templates.default;
   return {
-    headline: input.headline,
-    subheadline: input.subheadline,
-    cta: input.cta,
-    hashtags: input.hashtags || "#ZimBusiness #SupportLocal",
-    caption: fallback.caption,
+    headline: template.headline,
+    subheadline: template.subheadline,
+    cta: template.cta,
+    caption: template.caption,
+    hashtags: template.hashtags,
   };
 }
